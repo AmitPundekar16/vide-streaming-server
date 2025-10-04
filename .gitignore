@@ -1,2 +1,4 @@
 video-streaming-server
 Apikeys.py
+*.env
+users.db
