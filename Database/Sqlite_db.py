@@ -16,18 +16,18 @@ def create_table():
     conn.commit()
     conn.close()
 
-# ---------- Insert User ----------
-def insert_user(email, password):
+# ---------- Insert User / Register ----------
+def register_user(email, password):
     try:
         conn = sqlite3.connect("users.db")
         cursor = conn.cursor()
 
         cursor.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, password))
         conn.commit()
-        print("User added successfully!")
-
+        return True  # registration successful
     except sqlite3.IntegrityError:
         print("Error: Email already exists!")
+        return False
     finally:
         conn.close()
 
@@ -41,13 +41,9 @@ def check_user(email, password):
     conn.close()
 
     if result:
-        print("Login successful!")
         return True
     else:
-        print("Invalid email or password.")
         return False
 
-
-
-
-
+# ---------- Ensure table exists when module is imported ----------
+create_table()
