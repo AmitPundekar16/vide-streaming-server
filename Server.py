@@ -1,109 +1,95 @@
 import socket
-from supabase import create_client, Client
-import Apikeys  # contains SUPABASE_URL and SUPABASE_KEY
 import threading
+from supabase import create_client, Client
+import Apikeys
 
-# ---------- Supabase Setup ----------
+# Supabase client
 supabase: Client = create_client(Apikeys.SUPABASE_URL, Apikeys.SUPABASE_KEY)
-BUCKET_NAME = "A_Server"
 
 
-
-
-
-def get_video_list():
-    print(f"🪣 Checking bucket: {BUCKET_NAME}")
+# ---------- Get video bytes ----------
+def get_video_bytes(bucket_name, file_name):
+    print(f"🎥 Trying to fetch '{file_name}' from bucket '{bucket_name}'...")
     try:
-        # Debug 1: List buckets
-        buckets = supabase.storage.list_buckets()
-        print("📦 Buckets available:", [b['name'] for b in buckets])
-
-        # Debug 2: List objects in bucket
-        result = supabase.storage.from_(BUCKET_NAME).list()
-        print("🧾 Raw Supabase list() response:", result)
-
-        if not result:
-            print("⚠️ No files found. Bucket may be private or name mismatch.")
-        else:
-            print("✅ Files found:", [f["name"] for f in result])
-
-        return [f["name"] for f in result]
-    except Exception as e:
-        print("❌ Exception while listing videos:", e)
-        return []
-
-
-
-def get_video_bytes(file_name):
-    """
-    Fetch the requested video as bytes from Supabase.
-    """
-    try:
-        print(f"🎥 Fetching '{file_name}' from Supabase...")
-        response = supabase.storage.from_(BUCKET_NAME).download(file_name)
-        print(f"✅ Video '{file_name}' fetched ({len(response)} bytes)")
-        return response
-    except Exception as e:
-        print(f"❌ Error fetching video '{file_name}':", e)
+        result = supabase.storage.from_(bucket_name).download(file_name)
+        print(f"✅ Successfully fetched '{file_name}' ({len(result)} bytes)")
+        return result
+    except Exception as err:
+        print(f"❌ Couldn't fetch '{file_name}' from '{bucket_name}':", err)
         return None
 
 
-# ---------- Client Handler ----------
+# ---------- Get list of videos ----------
+def get_video_list(bucket_name):
+    try:
+        bucket_items = supabase.storage.from_(bucket_name).list()
+        return [f["name"] for f in bucket_items]
+    except Exception as err:
+        print(f"❌ Error listing videos in bucket '{bucket_name}':", err)
+        return []
+
+
+# ---------- Handle client ----------
 def handle_client(client_socket, address):
     print(f"🔗 Client connected: {address}")
     try:
-        # Receive request (LIST or GET <filename>)
-        request = client_socket.recv(1024).decode().strip()
-        print(f"📩 Request from {address}: {request}")
+        data = client_socket.recv(1024).decode().strip()
+        print(f"📩 Request from {address}: {data}")
 
-        if request == "LIST":
-            # Send list of available videos
-            videos = get_video_list()
-            client_socket.send(",".join(videos).encode())
+        if data.startswith("GET"):
+            parts = data.split(" ", 2)  # Split into 3 parts: GET, bucket, filename
+            if len(parts) < 3:
+                client_socket.send(b"ERROR: Missing bucket or file name.")
+                return
 
-        elif request.startswith("GET"):
-            # Extract filename
-            _, file_name = request.split(" ", 1)
-            video_bytes = get_video_bytes(file_name)
+            _, bucket_name, filename = parts
+            print(f"🪣 Bucket received from client: '{bucket_name}'")
+            print(f"🎥 File requested: '{filename}'")
 
-            if video_bytes:
-                # Send file size first
-                client_socket.send(str(len(video_bytes)).encode().ljust(16))
+            file_data = get_video_bytes(bucket_name, filename)  # Modify this function to accept bucket_name
 
-                # Send in chunks
+            if file_data:
+                size_str = str(len(file_data)).encode().ljust(16)
+                client_socket.send(size_str)
+
                 chunk_size = 4096
-                for i in range(0, len(video_bytes), chunk_size):
-                    client_socket.send(video_bytes[i:i + chunk_size])
-
-                print(f"✅ Finished sending {file_name}")
+                for i in range(0, len(file_data), chunk_size):
+                    client_socket.send(file_data[i:i + chunk_size])
+                print(f"✅ Done sending {filename} from bucket {bucket_name}")
             else:
-                client_socket.send(b"ERROR: Video not found or failed to fetch.")
+                client_socket.send(b"ERROR: Video not found or failed to download.")
 
+        elif data == "LIST":
+            # Optional: list videos for a specific bucket
+            client_socket.send(b"ERROR: LIST not implemented with bucket.")
         else:
-            client_socket.send(b"ERROR: Invalid request.")
+            client_socket.send(b"ERROR: Invalid request format.")
 
-    except Exception as e:
-        print(f"❌ Error handling client {address}: {e}")
-
+    except Exception as ex:
+        print(f"❌ Exception while handling {address}: {ex}")
     finally:
         client_socket.close()
         print(f"🔒 Disconnected: {address}")
 
 
-# ---------- Main Server ----------
+# ---------- Start server ----------
 def start_server(host="0.0.0.0", port=9999):
-    """
-    Start the Supabase video streaming server.
-    """
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((host, port))
-    server_socket.listen(5)
-    print(f"🚀 Server started on {host}:{port}")
-    print("💡 Waiting for client requests...")
+    print("🧠 Starting server...")
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        srv.bind((host, port))
+    except Exception as e:
+        print("❌ Failed to bind socket:", e)
+        return
+
+    srv.listen(5)
+    print(f"🚀 Server running at {host}:{port}")
+    print("💡 Waiting for clients...")
 
     while True:
-        client_socket, addr = server_socket.accept()
-        threading.Thread(target=handle_client, args=(client_socket, addr), daemon=True).start()
+        sock, addr = srv.accept()
+        thread = threading.Thread(target=handle_client, args=(sock, addr), daemon=True)
+        thread.start()
 
 
 if __name__ == "__main__":
