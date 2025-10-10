@@ -26,12 +26,15 @@ def create_table():
     conn.close()
 
 # ---------- Video Functions ----------
-def add_video(name, user_name):
+def add_video(name, user_name, bucket_name):
     """Insert a new video into the videos table."""
     try:
         conn = sqlite3.connect("users.db")
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO videos (name, user_name) VALUES (?, ?)", (name, user_name))
+        cursor.execute(
+            "INSERT INTO videos (name, user_name, bucket_name) VALUES (?, ?, ?)",
+            (name, user_name, bucket_name)
+        )      
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -41,20 +44,23 @@ def add_video(name, user_name):
         conn.close()
 
 
-def get_supabase_name(user_name):
+def get_supabase_name(user_name, bucket_name):
     """Return the Supabase file name for a given user_name"""
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM videos WHERE user_name = ?", (user_name,))
+    cursor.execute(
+                "SELECT name FROM videos WHERE user_name = ? AND bucket_name = ?",
+                (user_name, bucket_name)
+            )
     result = cursor.fetchone()
     conn.close()
     return result[0] if result else None
 
-def get_all_videos():
+def get_all_videos(bucket=None):
     """Return a list of tuples (name, user_name) for all videos."""
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT user_name FROM videos")
+    cursor.execute("SELECT user_name FROM videos WHERE bucket_name = ?", (bucket,))
     result = cursor.fetchall()
     conn.close()
     return result
