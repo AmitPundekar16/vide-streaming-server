@@ -1,0 +1,4 @@
+PyQt5>=5.15.11
+opencv-python>=4.11.0.86
+python-vlc>=3.0.21203
+supabase>=2.20.0
