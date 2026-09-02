@@ -48,30 +48,17 @@ A multi-threaded, desktop-based Video Streaming and Video-on-Demand (VoD) applic
 ## 🏗️ Architecture & System Design
 
 ```mermaid
-flowchart TD
-    subgraph Client ["PyQt5 Desktop Client"]
-        Auth[AuthWindow: Login / Signup] -->|Valid Credentials| Dash[DashboardWindow]
-        Dash -->|Keyword / Typo Correction| Search[SearchBar]
-        Dash -->|VoD Playback| VLC[Embedded LibVLC Player]
-        Dash -->|Live Broadcast View| LiveViewer[OpenCV Frame Canvas]
-    end
+flowchart LR
+    Client["🖥️ Desktop Client<br/>(PyQt5 + VLC)"]
+    Server["⚙️ Backend Server<br/>(TCP Sockets :9999)"]
+    DB[("💾 SQLite DB<br/>(Auth & Catalog)")]
+    Cloud["☁️ Supabase<br/>(Video Storage)"]
+    Cam["📹 Webcam<br/>(Live Feed)"]
 
-    subgraph Server ["TCP Socket Server (Server.py :9999)"]
-        Listener[Socket Listener] --> Router{Command Parser}
-        Router -->|'GET bucket filename'| Fetcher[Supabase Cloud Downloader]
-        Router -->|'LIVE'| Webcam[OpenCV VideoCapture 0]
-    end
-
-    subgraph Storage ["Storage & Database"]
-        DB[(SQLite3: users.db)]
-        Cloud[Supabase Storage Buckets]
-    end
-
-    Auth <-->|Verify / Store User| DB
-    Search <-->|Query Video Catalog| DB
-    Fetcher <-->|Fetch Video Binary| Cloud
-    Fetcher -->|4KB TCP Chunks| VLC
-    Webcam -->|Length-Prefixed Pickled Frames| LiveViewer
+    Client <-->|"Login / Search"| DB
+    Client <-->|"TCP Socket Stream<br/>('GET' / 'LIVE')"| Server
+    Server -->|"Fetch Videos"| Cloud
+    Server -->|"Capture Frames"| Cam
 ```
 
 ---
