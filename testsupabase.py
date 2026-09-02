@@ -1,16 +1,27 @@
-from supabase import create_client
-import Apikeys  # your config.py with SUPABASE_URL and SUPABASE_KEY
+import sqlite3
 
-# Create Supabase client
-supabase = create_client(Apikeys.SUPABASE_URL, Apikeys.SUPABASE_KEY)
+DB_PATH = "users.db"
 
-# Attempt to download the video
-try:
-    files = supabase.storage.from_("Videos").list()  # use your bucket name exactly
-    print("Files in bucket:", files)
+# ---------- Connect to DB ----------
+conn = sqlite3.connect(DB_PATH)
+cursor = conn.cursor()
 
-    video_bytes = supabase.storage.from_("Videos").download("hitman.mp4")
-    print("✅ Video fetched successfully!")
-    print("Video size (bytes):", len(video_bytes))
-except Exception as e:
-    print("❌ Error fetching video:", e)
+
+
+
+ 
+
+cursor.execute("""
+    INSERT INTO videos (name, user_name, bucket_name)
+    VALUES (?, ?, ?)
+""", ("chandnii.mp4", "The Only Love Of Cricket", "cricket"))
+conn.commit()
+print("✅ Added new video data.")
+
+cursor.execute("SELECT * FROM videos;")
+rows = cursor.fetchall()
+print("Current videos table:")
+for row in rows:
+    print(row)
+
+conn.close()

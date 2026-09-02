@@ -23,7 +23,6 @@ def validate_password(pw):
     return True
 
 
-# -------------- Authentication Window --------------
 class AuthWindow(QWidget):
     def __init__(self):
         super().__init__()
